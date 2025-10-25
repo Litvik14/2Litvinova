@@ -4,7 +4,7 @@
 
 using namespace std;
 
-Pipe::Pipe(int id) : id(id) {}
+Pipe::Pipe(int id) : id(id), name(""), length(0.0f), diametr(0), status(0) {}
 
 void Pipe::input() {
     cout << "Pipe name: ";
@@ -33,16 +33,6 @@ void Pipe::input() {
     cin.ignore();
 }
 
-int Pipe::getId() const { return id; }
-const string& Pipe::getName() const { return name; }
-float Pipe::getLength() const { return length; }
-int Pipe::getDiametr() const { return diametr; }
-int Pipe::getStatus() const { return status; }
-
-void Pipe::setStatus(int s) {
-    if (s == 0 || s == 1) status = s;
-}
-
 void Pipe::print() const {
     cout << "ID: " << id
         << " | Name: " << name
@@ -52,11 +42,7 @@ void Pipe::print() const {
 }
 
 void Pipe::save(ofstream& out) const {
-    out << id << "\n"
-        << name << "\n"
-        << length << "\n"
-        << diametr << "\n"
-        << status << "\n";
+    out << id << "\n" << name << "\n" << length << "\n" << diametr << "\n" << status << "\n";
 }
 
 void Pipe::load(ifstream& in) {

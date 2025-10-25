@@ -4,7 +4,9 @@
 
 using namespace std;
 
-CompressorStation::CompressorStation(int id) : id(id) {}
+CompressorStation::CompressorStation(int id)
+    : id(id), name(""), number_work(0), number_work_online(0), class_cs("") {
+}
 
 void CompressorStation::input() {
     cout << "CS name: ";
@@ -29,21 +31,6 @@ void CompressorStation::input() {
     getline(cin, class_cs);
 }
 
-int CompressorStation::getId() const { return id; }
-const string& CompressorStation::getName() const { return name; }
-int CompressorStation::getNumberWork() const { return number_work; }
-int CompressorStation::getNumberWorkOnline() const { return number_work_online; }
-const string& CompressorStation::getClass() const { return class_cs; }
-
-void CompressorStation::setNumberWorkOnline(int n) {
-    if (n >= 0 && n <= number_work) number_work_online = n;
-}
-
-float CompressorStation::getIdlePercent() const {
-    if (number_work == 0) return 0.0f;
-    return (number_work - number_work_online) * 100.0f / number_work;
-}
-
 void CompressorStation::print() const {
     cout << "ID: " << id
         << " | Name: " << name
@@ -54,11 +41,7 @@ void CompressorStation::print() const {
 }
 
 void CompressorStation::save(ofstream& out) const {
-    out << id << "\n"
-        << name << "\n"
-        << number_work << "\n"
-        << number_work_online << "\n"
-        << class_cs << "\n";
+    out << id << "\n" << name << "\n" << number_work << "\n" << number_work_online << "\n" << class_cs << "\n";
 }
 
 void CompressorStation::load(ifstream& in) {

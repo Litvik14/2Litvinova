@@ -15,13 +15,15 @@ private:
 public:
     CompressorStation(int id = -1);
     void input();
-    int getId() const;
-    const string& getName() const;
-    int getNumberWork() const;
-    int getNumberWorkOnline() const;
-    const string& getClass() const;
-    void setNumberWorkOnline(int n);
-    float getIdlePercent() const;
+    int getId() const { return id; }
+    const string& getName() const { return name; }
+    float getIdlePercent() const {
+        if (number_work == 0) return 0.0f;
+        return (number_work - number_work_online) * 100.0f / number_work;
+    }
+    void setNumberWorkOnline(int n) {
+        if (n >= 0 && n <= number_work) number_work_online = n;
+    }
     void print() const;
     void save(ofstream& out) const;
     void load(ifstream& in);

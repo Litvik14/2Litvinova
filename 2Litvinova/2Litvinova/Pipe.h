@@ -15,12 +15,10 @@ private:
 public:
     Pipe(int id = -1);
     void input();
-    int getId() const;
-    const string& getName() const;
-    float getLength() const;
-    int getDiametr() const;
-    int getStatus() const;
-    void setStatus(int s);
+    int getId() const { return id; }
+    const string& getName() const { return name; }
+    int getStatus() const { return status; }
+    void setStatus(int s) { if (s == 0 || s == 1) status = s; }
     void print() const;
     void save(ofstream& out) const;
     void load(ifstream& in);
