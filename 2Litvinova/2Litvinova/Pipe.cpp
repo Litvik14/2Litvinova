@@ -1,7 +1,6 @@
 #include "Pipe.h"
 #include <iostream>
 #include <limits>
-
 using namespace std;
 
 Pipe::Pipe(int id) : id(id), name(""), length(0.0f), diametr(0), status(0) {}
@@ -9,36 +8,53 @@ Pipe::Pipe(int id) : id(id), name(""), length(0.0f), diametr(0), status(0) {}
 void Pipe::input() {
     cout << "Pipe name: ";
     getline(cin, name);
+    cerr << name << endl;
 
     cout << "Length: ";
-    while (!(cin >> length) || length <= 0) {
-        cout << "Error! Enter positive number: ";
+    cin >> length;
+    while (cin.fail() || length <= 0 || cin.peek() != '\n') {
+        cout << "Error! Please, enter a positive number: ";
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    }
-
-    cout << "Diametr: ";
-    while (!(cin >> diametr) || diametr <= 0) {
-        cout << "Error! Enter positive integer: ";
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    }
-
-    cout << "Status (0 - ok, 1 - repair): ";
-    while (!(cin >> status) || (status != 0 && status != 1)) {
-        cout << "Error! Enter 0 or 1: ";
-        cin.clear();
-        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin >> length;
     }
     cin.ignore();
+    cerr << length << endl;
+
+    cout << "Diametr: ";
+    cin >> diametr;
+    while (cin.fail() || diametr <= 0 || cin.peek() != '\n') {
+        cout << "Error! Please, enter a positive integer: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin >> diametr;
+    }
+    cin.ignore();
+    cerr << diametr << endl;
+
+    cout << "Status (0 - ok, 1 - repair): ";
+    cin >> status;
+    while (cin.fail() || (status != 0 && status != 1) || cin.peek() != '\n') {
+        cout << "Error! Please, enter 0 or 1: ";
+        cin.clear();
+        cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin >> status;
+    }
+    cin.ignore();
+    cerr << status << endl;
+}
+
+ostream& operator<<(ostream& os, const Pipe& p) {
+    os << "ID: " << p.id
+        << " | Name: " << p.name
+        << " | Length: " << p.length
+        << " | Diametr: " << p.diametr
+        << " | Status: " << p.status;
+    return os;
 }
 
 void Pipe::print() const {
-    cout << "ID: " << id
-        << " | Name: " << name
-        << " | Length: " << length
-        << " | Diametr: " << diametr
-        << " | Status: " << status << "\n";
+    cout << *this << "\n";
 }
 
 void Pipe::save(ofstream& out) const {
@@ -46,6 +62,8 @@ void Pipe::save(ofstream& out) const {
 }
 
 void Pipe::load(ifstream& in) {
+    in >> id;
+    in.ignore();
     getline(in, name);
     in >> length >> diametr >> status;
     in.ignore();

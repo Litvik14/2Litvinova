@@ -1,7 +1,6 @@
 #include "CompressorStation.h"
 #include <iostream>
 #include <limits>
-
 using namespace std;
 
 CompressorStation::CompressorStation(int id)
@@ -11,33 +10,47 @@ CompressorStation::CompressorStation(int id)
 void CompressorStation::input() {
     cout << "CS name: ";
     getline(cin, name);
+    cerr << name << endl;
 
     cout << "Number of workshops: ";
-    while (!(cin >> number_work) || number_work <= 0) {
-        cout << "Error! Enter positive number: ";
+    cin >> number_work;
+    while (number_work <= 0 || cin.fail() || (cin.peek() != '\n')) {
+        cout << "Error! Please, enter a positive number: ";
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin >> number_work;
     }
+    cin.ignore();
+    cerr << number_work << endl;
 
     cout << "Workshops in operation: ";
-    while (!(cin >> number_work_online) || number_work_online < 0 || number_work_online > number_work) {
-        cout << "Error! Enter number between 0 and " << number_work << ": ";
+    cin >> number_work_online;
+    while (number_work_online < 0 || cin.fail() || number_work_online > number_work || (cin.peek() != '\n')) {
+        cout << "Error! Please, enter a positive number no more than the number of CG workshops: ";
         cin.clear();
         cin.ignore(numeric_limits<streamsize>::max(), '\n');
+        cin >> number_work_online;
     }
+    cin.ignore();
+    cerr << number_work_online << endl;
 
     cout << "CS class: ";
-    cin.ignore();
     getline(cin, class_cs);
+    cerr << class_cs << endl;
+}
+
+ostream& operator<<(ostream& os, const CompressorStation& cs) {
+    os << "ID: " << cs.id
+        << " | Name: " << cs.name
+        << " | Workshops: " << cs.number_work
+        << " | Online: " << cs.number_work_online
+        << " | Class: " << cs.class_cs
+        << " | Idle: " << cs.getIdlePercent() << "%";
+    return os;
 }
 
 void CompressorStation::print() const {
-    cout << "ID: " << id
-        << " | Name: " << name
-        << " | Workshops: " << number_work
-        << " | Online: " << number_work_online
-        << " | Class: " << class_cs
-        << " | Idle: " << getIdlePercent() << "%\n";
+    cout << *this << "\n";
 }
 
 void CompressorStation::save(ofstream& out) const {
@@ -45,6 +58,8 @@ void CompressorStation::save(ofstream& out) const {
 }
 
 void CompressorStation::load(ifstream& in) {
+    in >> id;
+    in.ignore();
     getline(in, name);
     in >> number_work >> number_work_online;
     in.ignore();
