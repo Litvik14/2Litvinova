@@ -3,7 +3,7 @@
 #include <limits>
 using namespace std;
 
-Pipe::Pipe(int id) : id(id), name(""), length(0.0f), diametr(0), status(0) {}
+Pipe::Pipe(int id) : id(id), name(""), length(0.0f), diametr(0), status(0), from_cs(-1), to_cs(-1) {}
 
 void Pipe::input() {
     cout << "Pipe name: ";
@@ -50,6 +50,9 @@ ostream& operator<<(ostream& os, const Pipe& p) {
         << " | Length: " << p.length
         << " | Diametr: " << p.diametr
         << " | Status: " << p.status;
+    if (p.isConnected()) {
+        os << " | From CS: " << p.from_cs << " | To CS: " << p.to_cs;
+    }
     return os;
 }
 
@@ -58,13 +61,12 @@ void Pipe::print() const {
 }
 
 void Pipe::save(ofstream& out) const {
-    out << id << "\n" << name << "\n" << length << "\n" << diametr << "\n" << status << "\n";
+    out << id << "\n" << name << "\n" << length << "\n" << diametr << "\n" << status << "\n"
+        << from_cs << "\n" << to_cs << "\n";
 }
 
 void Pipe::load(ifstream& in) {
-    in >> id;
+    in >> id >> length >> diametr >> status >> from_cs >> to_cs;
     in.ignore();
     getline(in, name);
-    in >> length >> diametr >> status;
-    in.ignore();
 }

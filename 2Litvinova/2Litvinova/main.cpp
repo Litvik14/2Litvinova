@@ -6,7 +6,96 @@
 #include <vector>
 #include <string>
 #include <fstream>
+#include <queue>
+#include <set>
+#include <map>
 using namespace std;
+
+unordered_map<int, vector<int>> network_graph;
+unordered_map<int, int> vertex_in_degree;
+set<int> all_stations;
+
+void addConnectionToGraph(int from, int to) {
+    network_graph[from].push_back(to);
+    vertex_in_degree[to]++;
+    all_stations.insert(from);
+    all_stations.insert(to);
+    if (vertex_in_degree.find(from) == vertex_in_degree.end()) {
+        vertex_in_degree[from] = 0;
+    }
+}
+
+void updateFreePipes(const unordered_map<int, Pipe>& pipes, map<int, vector<int>>& freeMap) {
+    freeMap.clear();
+    set<int> allowed = { 500, 700, 1000, 1400 };
+    for (const auto& item : pipes) {
+        const Pipe& p = item.second;
+        if (!p.isConnected() && allowed.find(p.getDiametr()) != allowed.end()) {
+            freeMap[p.getDiametr()].push_back(p.getId());
+        }
+    }
+}
+
+void connectStations(
+    unordered_map<int, Pipe>& pipes,
+    unordered_map<int, CompressorStation>& stations,
+    map<int, vector<int>>& free_pipes_by_diametr,
+    int from_cs_id, int to_cs_id, int diametr) {
+
+    if (!containsId(stations, from_cs_id) || !containsId(stations, to_cs_id)) {
+        cout << "Error: One of the stations not found!\n";
+        return;
+    }
+
+    if (free_pipes_by_diametr[diametr].empty()) {
+        static int nid = 1;
+        Pipe p(nid++);
+        string name = "Pipe_" + to_string(from_cs_id) + "_" + to_string(to_cs_id);
+        p.set(name, 100.0f, diametr, 0, from_cs_id, to_cs_id);
+        pipes[p.getId()] = p;
+        stations.at(from_cs_id).addOutputPipe(p.getId());
+        stations.at(to_cs_id).addInputPipe(p.getId());
+        cout << "Created new pipe ID=" << p.getId() << "\n";
+    }
+    else {
+        int pipe_id = free_pipes_by_diametr[diametr].back();
+        free_pipes_by_diametr[diametr].pop_back();
+        pipes.at(pipe_id).connect(from_cs_id, to_cs_id);
+        stations.at(from_cs_id).addOutputPipe(pipe_id);
+        stations.at(to_cs_id).addInputPipe(pipe_id);
+        cout << "Connected using existing pipe ID=" << pipe_id << "\n";
+    }
+
+    addConnectionToGraph(from_cs_id, to_cs_id);
+    updateFreePipes(pipes, free_pipes_by_diametr);
+}
+
+vector<int> topologicalSort() {
+    unordered_map<int, int> in_deg = vertex_in_degree;
+    queue<int> q;
+    vector<int> result;
+
+    for (int id : all_stations) {
+        if (in_deg[id] == 0) {
+            q.push(id);
+        }
+    }
+
+    while (!q.empty()) {
+        int u = q.front(); q.pop();
+        result.push_back(u);
+        if (network_graph.find(u) != network_graph.end()) {
+            for (int v : network_graph.at(u)) {
+                in_deg[v]--;
+                if (in_deg[v] == 0) {
+                    q.push(v);
+                }
+            }
+        }
+    }
+
+    return result;
+}
 
 vector<int> findPipes(const unordered_map<int, Pipe>& pipes, const string& namePart = "", int status = -1) {
     vector<int> ids;
@@ -150,10 +239,16 @@ void loadAll(unordered_map<int, Pipe>& pipes, unordered_map<int, CompressorStati
     }
     size_t n;
     pipes.clear(); stations.clear();
+    network_graph.clear();
+    vertex_in_degree.clear();
+    all_stations.clear();
 
     in >> n; in.ignore();
     for (size_t i = 0; i < n; ++i) {
         Pipe p(0); p.load(in); pipes[p.getId()] = p;
+        if (p.isConnected()) {
+            addConnectionToGraph(p.getFromCS(), p.getToCS());
+        }
     }
     in >> n; in.ignore();
     for (size_t i = 0; i < n; ++i) {
@@ -165,6 +260,7 @@ void loadAll(unordered_map<int, Pipe>& pipes, unordered_map<int, CompressorStati
 int main() {
     unordered_map<int, Pipe> pipes;
     unordered_map<int, CompressorStation> stations;
+    map<int, vector<int>> free_pipes_by_diametr;
 
     while (true) {
         cout << "\n--- MAIN MENU ---\n"
@@ -175,7 +271,9 @@ int main() {
             << "5. Search stations\n"
             << "6. Save\n"
             << "7. Load\n"
-            << "8. Exit\n"
+            << "8. Connect stations\n"
+            << "9. Topological sort\n"
+            << "10. Exit\n"
             << "Choice: ";
 
         int choice = inputInt("");
@@ -188,6 +286,7 @@ int main() {
             p.input();
             pipes[p.getId()] = p;
             cout << "Pipe added (ID=" << p.getId() << ")\n";
+            updateFreePipes(pipes, free_pipes_by_diametr);
             break;
         }
         case 2: {
@@ -245,8 +344,35 @@ int main() {
         }
 
         case 6: saveAll(pipes, stations); break;
-        case 7: loadAll(pipes, stations); break;
-        case 8:
+        case 7: loadAll(pipes, stations); updateFreePipes(pipes, free_pipes_by_diametr); break;
+
+        case 8: {
+            int from = inputInt("From CS ID: ");
+            int to = inputInt("To CS ID: ");
+            int diam = inputInt("Diameter (500/700/1000/1400): ");
+            set<int> allowed = { 500, 700, 1000, 1400 };
+            if (allowed.find(diam) == allowed.end()) {
+                cout << "Invalid diameter! Use 500, 700, 1000 or 1400.\n";
+                break;
+            }
+            connectStations(pipes, stations, free_pipes_by_diametr, from, to, diam);
+            break;
+        }
+
+        case 9: {
+            vector<int> topo = topologicalSort();
+            if (topo.size() != all_stations.size()) {
+                cout << "Network has cycles! Topological sort not possible.\n";
+            }
+            else {
+                cout << "Topological order: ";
+                for (int id : topo) cout << id << " ";
+                cout << "\n";
+            }
+            break;
+        }
+
+        case 10:
             cout << "Goodbye!\n";
             return 0;
         default:
