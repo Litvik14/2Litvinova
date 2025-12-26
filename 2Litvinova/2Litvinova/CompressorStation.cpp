@@ -10,6 +10,10 @@ CompressorStation::CompressorStation(int id)
 void CompressorStation::input() {
     cout << "CS name: ";
     getline(cin, name);
+    while (name.empty()) {
+        cout << "Error! Name cannot be empty. Please enter a name: ";
+        getline(cin, name);
+    }
     cerr << name << endl;
 
     cout << "Number of workshops: ";
@@ -36,6 +40,10 @@ void CompressorStation::input() {
 
     cout << "CS class: ";
     getline(cin, class_cs);
+    while (class_cs.empty()) {
+        cout << "Error! Class cannot be empty. Please enter a class: ";
+        getline(cin, class_cs);
+    }
     cerr << class_cs << endl;
 }
 

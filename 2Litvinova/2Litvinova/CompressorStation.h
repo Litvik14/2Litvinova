@@ -1,7 +1,6 @@
 #pragma once
 #include <string>
 #include <fstream>
-#include <vector>
 using namespace std;
 
 class CompressorStation {
@@ -11,8 +10,6 @@ private:
     int number_work;
     int number_work_online;
     string class_cs;
-    vector<int> input_pipes;
-    vector<int> output_pipes;
 
 public:
     CompressorStation(int id = -1);
@@ -32,11 +29,6 @@ public:
     void setNumberWorkOnline(int n) {
         if (n >= 0 && n <= number_work) number_work_online = n;
     }
-
-    void addInputPipe(int pipe_id) { input_pipes.push_back(pipe_id); }
-    void addOutputPipe(int pipe_id) { output_pipes.push_back(pipe_id); }
-    const vector<int>& getInputPipes() const { return input_pipes; }
-    const vector<int>& getOutputPipes() const { return output_pipes; }
 
     bool operator==(const CompressorStation& other) const {
         return id == other.id;

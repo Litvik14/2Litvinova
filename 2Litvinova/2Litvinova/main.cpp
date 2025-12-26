@@ -1,101 +1,10 @@
-#include "Pipe.h"
-#include "CompressorStation.h"
+﻿#include "GasNetwork.h"
 #include "utils.h"
 #include <iostream>
-#include <unordered_map>
-#include <vector>
-#include <string>
 #include <fstream>
-#include <queue>
-#include <set>
-#include <map>
+#include <vector>
+#include <iomanip>
 using namespace std;
-
-unordered_map<int, vector<int>> network_graph;
-unordered_map<int, int> vertex_in_degree;
-set<int> all_stations;
-
-void addConnectionToGraph(int from, int to) {
-    network_graph[from].push_back(to);
-    vertex_in_degree[to]++;
-    all_stations.insert(from);
-    all_stations.insert(to);
-    if (vertex_in_degree.find(from) == vertex_in_degree.end()) {
-        vertex_in_degree[from] = 0;
-    }
-}
-
-void updateFreePipes(const unordered_map<int, Pipe>& pipes, map<int, vector<int>>& freeMap) {
-    freeMap.clear();
-    set<int> allowed = { 500, 700, 1000, 1400 };
-    for (const auto& item : pipes) {
-        const Pipe& p = item.second;
-        if (!p.isConnected() && allowed.find(p.getDiametr()) != allowed.end()) {
-            freeMap[p.getDiametr()].push_back(p.getId());
-        }
-    }
-}
-
-void connectStations(
-    unordered_map<int, Pipe>& pipes,
-    unordered_map<int, CompressorStation>& stations,
-    map<int, vector<int>>& free_pipes_by_diametr,
-    int from_cs_id, int to_cs_id, int diametr) {
-
-    if (!containsId(stations, from_cs_id) || !containsId(stations, to_cs_id)) {
-        cout << "Error: One of the stations not found!\n";
-        return;
-    }
-
-    if (free_pipes_by_diametr[diametr].empty()) {
-        static int nid = 1;
-        Pipe p(nid++);
-        string name = "Pipe_" + to_string(from_cs_id) + "_" + to_string(to_cs_id);
-        p.set(name, 100.0f, diametr, 0, from_cs_id, to_cs_id);
-        pipes[p.getId()] = p;
-        stations.at(from_cs_id).addOutputPipe(p.getId());
-        stations.at(to_cs_id).addInputPipe(p.getId());
-        cout << "Created new pipe ID=" << p.getId() << "\n";
-    }
-    else {
-        int pipe_id = free_pipes_by_diametr[diametr].back();
-        free_pipes_by_diametr[diametr].pop_back();
-        pipes.at(pipe_id).connect(from_cs_id, to_cs_id);
-        stations.at(from_cs_id).addOutputPipe(pipe_id);
-        stations.at(to_cs_id).addInputPipe(pipe_id);
-        cout << "Connected using existing pipe ID=" << pipe_id << "\n";
-    }
-
-    addConnectionToGraph(from_cs_id, to_cs_id);
-    updateFreePipes(pipes, free_pipes_by_diametr);
-}
-
-vector<int> topologicalSort() {
-    unordered_map<int, int> in_deg = vertex_in_degree;
-    queue<int> q;
-    vector<int> result;
-
-    for (int id : all_stations) {
-        if (in_deg[id] == 0) {
-            q.push(id);
-        }
-    }
-
-    while (!q.empty()) {
-        int u = q.front(); q.pop();
-        result.push_back(u);
-        if (network_graph.find(u) != network_graph.end()) {
-            for (int v : network_graph.at(u)) {
-                in_deg[v]--;
-                if (in_deg[v] == 0) {
-                    q.push(v);
-                }
-            }
-        }
-    }
-
-    return result;
-}
 
 vector<int> findPipes(const unordered_map<int, Pipe>& pipes, const string& namePart = "", int status = -1) {
     vector<int> ids;
@@ -123,31 +32,56 @@ vector<int> findStations(const unordered_map<int, CompressorStation>& stations, 
     return ids;
 }
 
-void batchEditPipes(unordered_map<int, Pipe>& pipes, const vector<int>& ids) {
+void batchEditPipes(GasNetwork& net, const vector<int>& ids) {
     if (ids.empty()) return;
     if (confirm("Edit all found pipes?")) {
         for (int id : ids) {
             cout << "\nEditing pipe ID=" << id << "\n";
-            pipes.at(id).input();
+            Pipe p = net.getPipes().at(id);
+            p.input();
+            net.addPipe(p);
         }
     }
     else {
         string line = inputString("Enter IDs to edit (space-separated): ");
         vector<int> sel = parseIds(line);
         for (int id : sel) {
-            if (pipes.count(id)) {
-                pipes.at(id).input();
+            if (net.getPipes().count(id)) {
+                Pipe p = net.getPipes().at(id);
+                p.input();
+                net.addPipe(p);
             }
         }
     }
 }
 
-void batchDeletePipes(unordered_map<int, Pipe>& pipes, const vector<int>& ids) {
+void batchEditStations(GasNetwork& net, const vector<int>& ids) {
+    if (ids.empty()) return;
+    if (confirm("Edit all found stations?")) {
+        for (int id : ids) {
+            cout << "\nEditing station ID=" << id << "\n";
+            CompressorStation s = net.getStations().at(id);
+            s.input();
+            net.addStation(s);
+        }
+    }
+    else {
+        string line = inputString("Enter IDs to edit (space-separated): ");
+        vector<int> sel = parseIds(line);
+        for (int id : sel) {
+            if (net.getStations().count(id)) {
+                CompressorStation s = net.getStations().at(id);
+                s.input();
+                net.addStation(s);
+            }
+        }
+    }
+}
+
+void batchDeletePipes(GasNetwork& net, const vector<int>& ids) {
     if (ids.empty()) return;
     if (confirm("Delete all found pipes?")) {
-        for (int id : ids) {
-            pipes.erase(id);
-        }
+        for (int id : ids) net.deletePipe(id);
         cout << "Deleted " << ids.size() << " pipe(s).\n";
     }
     else {
@@ -155,37 +89,19 @@ void batchDeletePipes(unordered_map<int, Pipe>& pipes, const vector<int>& ids) {
         vector<int> sel = parseIds(line);
         int cnt = 0;
         for (int id : sel) {
-            if (pipes.erase(id)) cnt++;
+            if (net.getPipes().count(id)) {
+                net.deletePipe(id);
+                cnt++;
+            }
         }
         cout << "Deleted " << cnt << " pipe(s).\n";
     }
 }
 
-void batchEditStations(unordered_map<int, CompressorStation>& stations, const vector<int>& ids) {
-    if (ids.empty()) return;
-    if (confirm("Edit all found stations?")) {
-        for (int id : ids) {
-            cout << "\nEditing station ID=" << id << "\n";
-            stations.at(id).input();
-        }
-    }
-    else {
-        string line = inputString("Enter IDs to edit (space-separated): ");
-        vector<int> sel = parseIds(line);
-        for (int id : sel) {
-            if (stations.count(id)) {
-                stations.at(id).input();
-            }
-        }
-    }
-}
-
-void batchDeleteStations(unordered_map<int, CompressorStation>& stations, const vector<int>& ids) {
+void batchDeleteStations(GasNetwork& net, const vector<int>& ids) {
     if (ids.empty()) return;
     if (confirm("Delete all found stations?")) {
-        for (int id : ids) {
-            stations.erase(id);
-        }
+        for (int id : ids) net.deleteStation(id);
         cout << "Deleted " << ids.size() << " station(s).\n";
     }
     else {
@@ -193,35 +109,23 @@ void batchDeleteStations(unordered_map<int, CompressorStation>& stations, const 
         vector<int> sel = parseIds(line);
         int cnt = 0;
         for (int id : sel) {
-            if (stations.erase(id)) cnt++;
+            if (net.getStations().count(id)) {
+                net.deleteStation(id);
+                cnt++;
+            }
         }
         cout << "Deleted " << cnt << " station(s).\n";
     }
 }
 
-void printAll(const unordered_map<int, Pipe>& pipes, const unordered_map<int, CompressorStation>& stations) {
-    if (pipes.empty() && stations.empty()) {
-        cout << "No data.\n";
-        return;
-    }
-    if (!pipes.empty()) {
-        cout << "\n--- PIPES ---\n";
-        printAllObjects(pipes);
-    }
-    if (!stations.empty()) {
-        cout << "\n--- COMPRESSOR STATIONS ---\n";
-        printAllObjects(stations);
-    }
-}
-
-void saveAll(const unordered_map<int, Pipe>& pipes, const unordered_map<int, CompressorStation>& stations) {
-    string fname = inputString("Enter filename to save: ");
-    if (fname.empty()) fname = "data.txt";
+void saveAll(const GasNetwork& network, const string& fname) {
     ofstream out(fname);
     if (!out) {
         cout << "Save failed.\n";
         return;
     }
+    const auto& pipes = network.getPipes();
+    const auto& stations = network.getStations();
     out << pipes.size() << "\n";
     for (const auto& item : pipes) item.second.save(out);
     out << stations.size() << "\n";
@@ -229,139 +133,174 @@ void saveAll(const unordered_map<int, Pipe>& pipes, const unordered_map<int, Com
     cout << "Saved to '" << fname << "'\n";
 }
 
-void loadAll(unordered_map<int, Pipe>& pipes, unordered_map<int, CompressorStation>& stations) {
-    string fname = inputString("Enter filename to load: ");
-    if (fname.empty()) fname = "data.txt";
+void loadAll(GasNetwork& network, const string& fname) {
     ifstream in(fname);
     if (!in) {
         cout << "File not found.\n";
         return;
     }
     size_t n;
-    pipes.clear(); stations.clear();
-    network_graph.clear();
-    vertex_in_degree.clear();
-    all_stations.clear();
-
-    in >> n; in.ignore();
+    in >> n;
+    in.ignore();
     for (size_t i = 0; i < n; ++i) {
-        Pipe p(0); p.load(in); pipes[p.getId()] = p;
-        if (p.isConnected()) {
-            addConnectionToGraph(p.getFromCS(), p.getToCS());
-        }
+        Pipe p(0); p.load(in); network.addPipe(p);
     }
-    in >> n; in.ignore();
+    in >> n;
+    in.ignore();
     for (size_t i = 0; i < n; ++i) {
-        CompressorStation s(0); s.load(in); stations[s.getId()] = s;
+        CompressorStation s(0); s.load(in); network.addStation(s);
     }
     cout << "Loaded from '" << fname << "'\n";
 }
 
 int main() {
-    unordered_map<int, Pipe> pipes;
-    unordered_map<int, CompressorStation> stations;
-    map<int, vector<int>> free_pipes_by_diametr;
+    GasNetwork network;
 
     while (true) {
         cout << "\n--- MAIN MENU ---\n"
             << "1. Add pipe\n"
             << "2. Add compressor station\n"
             << "3. Show all\n"
-            << "4. Search pipes\n"
-            << "5. Search stations\n"
-            << "6. Save\n"
-            << "7. Load\n"
-            << "8. Connect stations\n"
-            << "9. Topological sort\n"
-            << "10. Exit\n"
+            << "4. Edit pipe\n"
+            << "5. Edit station\n"
+            << "6. Delete pipe\n"
+            << "7. Delete station\n"
+            << "8. Search pipes\n"
+            << "9. Search stations\n"
+            << "10. Connect stations\n"
+            << "11. Topological sort\n"
+            << "12. Max flow\n"
+            << "13. Shortest path\n"
+            << "14. Save\n"
+            << "15. Load\n"
+            << "16. Exit\n"
             << "Choice: ";
 
         int choice = inputInt("");
-        vector<int> foundIds;
 
         switch (choice) {
         case 1: {
-            static int nid = 1;
-            Pipe p(nid++);
+            Pipe p(-1);
             p.input();
-            pipes[p.getId()] = p;
-            cout << "Pipe added (ID=" << p.getId() << ")\n";
-            updateFreePipes(pipes, free_pipes_by_diametr);
+            network.addPipe(p);
             break;
         }
         case 2: {
-            static int nid = 1;
-            CompressorStation s(nid++);
+            CompressorStation s(-1);
             s.input();
-            stations[s.getId()] = s;
-            cout << "Station added (ID=" << s.getId() << ")\n";
+            network.addStation(s);
             break;
         }
-        case 3:
-            printAll(pipes, stations);
-            break;
+        case 3: {
+            const auto& pipes = network.getPipes();
+            const auto& stations = network.getStations();
 
+            if (pipes.empty() && stations.empty()) {
+                cout << "No data.\n";
+            }
+            else {
+                if (!pipes.empty()) {
+                    cout << "\n--- PIPES ---\n";
+                    printAllObjects(pipes);
+                }
+                else {
+                    cout << "\nNo pipes.\n";
+                }
+
+                if (!stations.empty()) {
+                    cout << "\n--- COMPRESSOR STATIONS ---\n";
+                    printAllObjects(stations);
+                }
+                else {
+                    cout << "\nNo stations.\n";
+                }
+
+                network.printNetwork();
+            }
+            break;
+        }
         case 4: {
+            int id = inputInt("Pipe ID to edit: ");
+            if (network.getPipes().count(id)) {
+                Pipe p = network.getPipes().at(id);
+                p.input();
+                network.addPipe(p);
+            }
+            else {
+                cout << "Pipe not found.\n";
+            }
+            break;
+        }
+        case 5: {
+            int id = inputInt("Station ID to edit: ");
+            if (network.getStations().count(id)) {
+                CompressorStation s = network.getStations().at(id);
+                s.input();
+                network.addStation(s);
+            }
+            else {
+                cout << "Station not found.\n";
+            }
+            break;
+        }
+        case 6: {
+            int id = inputInt("Pipe ID to delete: ");
+            network.deletePipe(id);
+            cout << "Pipe deleted.\n";
+            break;
+        }
+        case 7: {
+            int id = inputInt("Station ID to delete: ");
+            network.deleteStation(id);
+            cout << "Station deleted.\n";
+            break;
+        }
+        case 8: {
             string name = inputString("Pipe name (empty to skip): ");
             string statusStr = inputString("Status (0=ok, 1=repair, empty=all): ");
             int status = -1;
             if (!statusStr.empty()) status = stoi(statusStr);
-            foundIds = findPipes(pipes, name, status);
-            if (foundIds.empty()) {
+            vector<int> found = findPipes(network.getPipes(), name, status);
+            if (found.empty()) {
                 cout << "No pipes found.\n";
             }
             else {
-                cout << "\nFound " << foundIds.size() << " pipe(s):\n";
-                for (int id : foundIds) {
-                    cout << pipes.at(id) << "\n";
-                }
+                cout << "\nFound " << found.size() << " pipe(s):\n";
+                for (int id : found) cout << network.getPipes().at(id) << "\n";
                 int op = inputInt("Actions: 1=Edit, 2=Delete, 0=Back: ");
-                if (op == 1) batchEditPipes(pipes, foundIds);
-                else if (op == 2) batchDeletePipes(pipes, foundIds);
+                if (op == 1) batchEditPipes(network, found);
+                else if (op == 2) batchDeletePipes(network, found);
             }
             break;
         }
-
-        case 5: {
+        case 9: {
             string name = inputString("Station name (empty to skip): ");
             string idleStr = inputString("Min idle % (empty to skip): ");
             float minIdle = -1.0f;
             if (!idleStr.empty()) minIdle = stof(idleStr);
-            foundIds = findStations(stations, name, minIdle);
-            if (foundIds.empty()) {
+            vector<int> found = findStations(network.getStations(), name, minIdle);
+            if (found.empty()) {
                 cout << "No stations found.\n";
             }
             else {
-                cout << "\nFound " << foundIds.size() << " station(s):\n";
-                for (int id : foundIds) {
-                    cout << stations.at(id) << "\n";
-                }
+                cout << "\nFound " << found.size() << " station(s):\n";
+                for (int id : found) cout << network.getStations().at(id) << "\n";
                 int op = inputInt("Actions: 1=Edit, 2=Delete, 0=Back: ");
-                if (op == 1) batchEditStations(stations, foundIds);
-                else if (op == 2) batchDeleteStations(stations, foundIds);
+                if (op == 1) batchEditStations(network, found);
+                else if (op == 2) batchDeleteStations(network, found);
             }
             break;
         }
-
-        case 6: saveAll(pipes, stations); break;
-        case 7: loadAll(pipes, stations); updateFreePipes(pipes, free_pipes_by_diametr); break;
-
-        case 8: {
+        case 10: {
             int from = inputInt("From CS ID: ");
             int to = inputInt("To CS ID: ");
-            int diam = inputInt("Diameter (500/700/1000/1400): ");
-            set<int> allowed = { 500, 700, 1000, 1400 };
-            if (allowed.find(diam) == allowed.end()) {
-                cout << "Invalid diameter! Use 500, 700, 1000 or 1400.\n";
-                break;
-            }
-            connectStations(pipes, stations, free_pipes_by_diametr, from, to, diam);
+            int d = inputInt("Diameter (500/700/1000/1400): ");
+            network.connect(from, to, d);
             break;
         }
-
-        case 9: {
-            vector<int> topo = topologicalSort();
-            if (topo.size() != all_stations.size()) {
+        case 11: {
+            vector<int> topo = network.topologicalSort();
+            if (topo.size() != network.getStations().size()) {
                 cout << "Network has cycles! Topological sort not possible.\n";
             }
             else {
@@ -371,8 +310,44 @@ int main() {
             }
             break;
         }
-
-        case 10:
+        case 12: {
+            int src = inputInt("Source CS ID: ");
+            int sink = inputInt("Sink CS ID: ");
+            double flow = network.maxFlow(src, sink);
+            cout << fixed << setprecision(3);  // ← 3 знака после запятой
+            cout << "Max flow: " << flow << "\n";
+            break;
+        }
+        case 13: {
+            int from = inputInt("From CS ID: ");
+            int to = inputInt("To CS ID: ");
+            vector<int> path = network.shortestPath(from, to);
+            if (path.size() <= 1) {
+                cout << "No path found.\n";
+            }
+            else {
+                cout << "Shortest path: ";
+                for (size_t i = 0; i < path.size(); ++i) {
+                    cout << path[i];
+                    if (i + 1 < path.size()) cout << " -> ";
+                }
+                cout << "\n";
+            }
+            break;
+        }
+        case 14: {
+            string fname = inputString("Enter filename to save: ");
+            if (fname.empty()) fname = "data.txt";
+            saveAll(network, fname);
+            break;
+        }
+        case 15: {
+            string fname = inputString("Enter filename to load: ");
+            if (fname.empty()) fname = "data.txt";
+            loadAll(network, fname);
+            break;
+        }
+        case 16:
             cout << "Goodbye!\n";
             return 0;
         default:
